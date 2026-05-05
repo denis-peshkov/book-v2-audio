@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import re
 from pathlib import Path
 from typing import Any, Callable, Dict, List, Optional
 
@@ -63,6 +64,7 @@ class EdgeTTSManager(TTSBackend):
         output_dir: Optional[Path] = None,
         max_retries: int = 3,
         retry_delay: float = 2.0,
+        segment_index: Optional[int] = None,
     ) -> Path:
         """Синтез одного текстового сегмента в аудиофайл с повторными попытками.
 
@@ -73,22 +75,39 @@ class EdgeTTSManager(TTSBackend):
             output_dir: Директория для временного файла.
             max_retries: Количество повторных попыток при ошибках сервера (5xx).
             retry_delay: Начальная задержка перед повтором (сек), удваивается.
+            segment_index: Индекс сегмента (для именования файлов).
 
         Returns:
             Путь к аудиофайлу.
 
         Raises:
-            Exception: Если все попытки исчерпаны.
+            RuntimeError: Если все попытки исчерпаны или текст пустой.
         """
         if output_dir is None:
             output_dir = Path.cwd() / "temp_audio"
         output_dir.mkdir(parents=True, exist_ok=True)
 
-        # Генерируем уникальное имя файла
-        import hashlib
-        import time
-        hash_str = hashlib.md5(f"{text}{time.time()}".encode()).hexdigest()[:8]
-        output_path = output_dir / f"segment_{hash_str}.mp3"
+        # Проверка текста: пустой, только пробелы или без букв — генерируем тишину
+        if not text or not text.strip() or not re.search(
+            r'[а-яА-ЯёЁa-zA-Z]', text
+        ):
+            logger.warning(
+                "Текст сегмента не содержит букв — генерирую тишину (0.5с): %r",
+                text[:80],
+            )
+            seg_name = f"seg_{segment_index:06d}" if segment_index is not None else "silence"
+            output_path = output_dir / f"{seg_name}.mp3"
+            await self._generate_silence_mp3(output_path, duration_sec=0.5)
+            return output_path
+
+        # Именование по индексу (если есть) или по хешу
+        if segment_index is not None:
+            output_path = output_dir / f"seg_{segment_index:06d}.mp3"
+        else:
+            import hashlib
+            import time
+            hash_str = hashlib.md5(f"{text}{time.time()}".encode()).hexdigest()[:8]
+            output_path = output_dir / f"segment_{hash_str}.mp3"
 
         # Настройка скорости через SSML
         rate = f"+{int((speed - 1.0) * 100)}%" if speed >= 1.0 else f"-{int((1.0 - speed) * 100)}%"
@@ -147,7 +166,45 @@ class EdgeTTSManager(TTSBackend):
                 raise
 
         # Все попытки исчерпаны
-        raise last_exception  # type: ignore[misc]
+        raise RuntimeError(
+            f"Edge TTS: все {max_retries} попыток исчерпаны: {last_exception}"
+        ) from last_exception
+
+    async def _generate_silence_mp3(
+        self, output_path: Path, duration_sec: float = 0.5
+    ) -> None:
+        """Сгенерировать тишину в MP3 через ffmpeg.
+
+        Используется как fallback, когда Edge TTS не может синтезировать
+        пустой или неподдерживаемый текст.
+
+        Args:
+            output_path: Путь для выходного MP3-файла.
+            duration_sec: Длительность тишины в секундах.
+
+        Raises:
+            RuntimeError: Если ffmpeg не удалось сгенерировать тишину.
+        """
+        cmd = [
+            "ffmpeg", "-y",
+            "-f", "lavfi", "-i", "anullsrc=r=22050:cl=mono",
+            "-t", str(duration_sec),
+            "-acodec", "libmp3lame", "-q:a", "2",
+            str(output_path),
+        ]
+        process = await asyncio.create_subprocess_exec(
+            *cmd,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+        _, stderr = await process.communicate()
+
+        if process.returncode != 0:
+            error_msg = stderr.decode("utf-8", errors="replace") if stderr else ""
+            raise RuntimeError(
+                f"Ошибка генерации тишины (код {process.returncode}): "
+                f"{error_msg[:200]}"
+            )
 
     async def synthesize_chapter(
         self,
@@ -183,9 +240,20 @@ class EdgeTTSManager(TTSBackend):
         for i, text in enumerate(text_segments):
             # Основной текст
             _report_segment(text, self.config.main_voice)
-            path = await self.synthesize_segment(
-                text, self.config.main_voice, self.config.main_speed, chapter_dir
-            )
+            try:
+                path = await self.synthesize_segment(
+                    text, self.config.main_voice, self.config.main_speed,
+                    chapter_dir, segment_index=i * 2,
+                )
+            except RuntimeError as e:
+                logger.error(
+                    "Ошибка синтеза сегмента #%d (гл.текст): %s — генерирую тишину",
+                    i, e,
+                )
+                silence_path = chapter_dir / f"seg_{i * 2:06d}.mp3"
+                await self._generate_silence_mp3(silence_path, duration_sec=0.5)
+                path = silence_path
+                # Всё равно считаем выполненным для прогресса
             audio_paths.append(path)
             completed += 1
             if progress_callback:
@@ -195,10 +263,20 @@ class EdgeTTSManager(TTSBackend):
             if i < len(comment_segments) and comment_segments[i]:
                 comment = comment_segments[i]
                 _report_segment(comment, self.config.comment_voice)
-                path = await self.synthesize_segment(
-                    comment, self.config.comment_voice,
-                    self.config.comment_speed, chapter_dir
-                )
+                try:
+                    path = await self.synthesize_segment(
+                        comment, self.config.comment_voice,
+                        self.config.comment_speed, chapter_dir,
+                        segment_index=i * 2 + 1,
+                    )
+                except RuntimeError as e:
+                    logger.error(
+                        "Ошибка синтеза комментария #%d: %s — генерирую тишину",
+                        i, e,
+                    )
+                    silence_path = chapter_dir / f"seg_{i * 2 + 1:06d}.mp3"
+                    await self._generate_silence_mp3(silence_path, duration_sec=0.5)
+                    path = silence_path
                 audio_paths.append(path)
                 completed += 1
                 if progress_callback:
