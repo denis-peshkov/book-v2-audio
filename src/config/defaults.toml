@@ -1,0 +1,38 @@
+# Настройки по умолчанию для Audiobook Generator
+
+# Язык
+ui_lang = "ru"
+book_lang = "ru"
+
+# AI-провайдер
+ai_provider = "deepseek"
+
+# TTS бэкенд ("edge" — облачный Edge TTS, "piper" — локальный Piper TTS)
+tts_backend = "edge"
+
+# Голоса TTS (русские)
+main_voice = "ru-RU-SvetlanaNeural"
+comment_voice = "ru-RU-DmitryNeural"
+main_speed = 1.0
+comment_speed = 1.0
+
+# Паузы (в секундах)
+pause_before_comment = 1.0
+pause_after_comment = 0.7
+pause_between_sentences = 0.3
+chapter_pause = 1.5
+
+# Комментарии
+comment_frequency = 5
+max_concurrent = 5
+system_prompt = ""
+
+# Пути
+output_dir = "~/audiobooks"
+
+# Окно
+window_width = 800
+window_height = 600
+
+# Первый запуск
+first_run = true

@@ -1,0 +1,54 @@
+# --- Python ---
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.egg-info/
+*.egg
+dist/
+build/
+*.spec
+venv/
+.venv/
+env/
+
+# --- IDE ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# --- OS ---
+.DS_Store
+Thumbs.db
+Desktop.ini
+
+# --- Project-specific ---
+# FB2 book files (large, not part of source)
+*.fb2
+
+# Audiobook output
+audiobooks/
+
+# User config & logs (stored in ~/.audiobook-generator/)
+*.log
+
+# Checkpoints (generated at runtime)
+*.checkpoint
+
+# Temp audio from Piper/Edge TTS fallback directory
+temp_audio/
+
+# Piper voice model cache (if downloaded into project)
+*.onnx
+*.onnx.json
+
+# --- Testing ---
+.coverage
+.pytest_cache/
+htmlcov/
+
+# --- Environment ---
+.env
+.env.local

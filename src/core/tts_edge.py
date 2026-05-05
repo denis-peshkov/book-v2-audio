@@ -1,0 +1,235 @@
+"""
+Модуль синтеза речи через Microsoft Edge TTS.
+Реализует интерфейс TTSBackend.
+"""
+
+from __future__ import annotations
+
+import asyncio
+import logging
+from pathlib import Path
+from typing import Any, Callable, Dict, List, Optional
+
+import edge_tts
+
+from src.core.tts_base import TTSBackend
+
+logger = logging.getLogger(__name__)
+
+
+# Голоса по умолчанию для разных языков
+DEFAULT_VOICES = {
+    "ru": {
+        "main": "ru-RU-SvetlanaNeural",
+        "comment": "ru-RU-DmitryNeural",
+    },
+    "en": {
+        "main": "en-US-JennyNeural",
+        "comment": "en-US-GuyNeural",
+    },
+    "ja": {
+        "main": "ja-JP-NanamiNeural",
+        "comment": "ja-JP-KeitaNeural",
+    },
+    "zh": {
+        "main": "zh-CN-XiaoxiaoNeural",
+        "comment": "zh-CN-YunxiNeural",
+    },
+}
+
+
+class EdgeTTSManager(TTSBackend):
+    """Менеджер синтеза речи через edge-tts.
+
+    Поддерживает два раздельных голоса: для основного текста и для комментариев.
+    """
+
+    def __init__(self, config):
+        """Инициализация EdgeTTSManager.
+
+        Args:
+            config: Объект TTSConfig с настройками (main_voice, comment_voice, main_speed, comment_speed).
+        """
+        self.config = config
+        # Сохраняем голоса для быстрого доступа из колбэков
+        self._main_voice_name = ""
+        self._comment_voice_name = ""
+
+    async def synthesize_segment(
+        self,
+        text: str,
+        voice: str,
+        speed: float = 1.0,
+        output_dir: Optional[Path] = None,
+        max_retries: int = 3,
+        retry_delay: float = 2.0,
+    ) -> Path:
+        """Синтез одного текстового сегмента в аудиофайл с повторными попытками.
+
+        Args:
+            text: Текст для озвучки.
+            voice: Имя голоса (например, ru-RU-DariyaNeural).
+            speed: Темп речи (1.0 = нормальный).
+            output_dir: Директория для временного файла.
+            max_retries: Количество повторных попыток при ошибках сервера (5xx).
+            retry_delay: Начальная задержка перед повтором (сек), удваивается.
+
+        Returns:
+            Путь к аудиофайлу.
+
+        Raises:
+            Exception: Если все попытки исчерпаны.
+        """
+        if output_dir is None:
+            output_dir = Path.cwd() / "temp_audio"
+        output_dir.mkdir(parents=True, exist_ok=True)
+
+        # Генерируем уникальное имя файла
+        import hashlib
+        import time
+        hash_str = hashlib.md5(f"{text}{time.time()}".encode()).hexdigest()[:8]
+        output_path = output_dir / f"segment_{hash_str}.mp3"
+
+        # Настройка скорости через SSML
+        rate = f"+{int((speed - 1.0) * 100)}%" if speed >= 1.0 else f"-{int((1.0 - speed) * 100)}%"
+
+        # Таймаут на синтез одного сегмента (сек).
+        SEGMENT_TIMEOUT = 120
+
+        last_exception: Optional[Exception] = None
+        for attempt in range(1, max_retries + 1):
+            try:
+                communicate = edge_tts.Communicate(text, voice, rate=rate)
+                await asyncio.wait_for(
+                    communicate.save(str(output_path)),
+                    timeout=SEGMENT_TIMEOUT,
+                )
+
+                logger.debug(
+                    "Синтезирован сегмент: голос=%s, длина=%d символов, файл=%s",
+                    voice, len(text), output_path.name,
+                )
+                return output_path
+
+            except Exception as exc:
+                last_exception = exc
+                exc_str = str(exc)
+
+                # Повторяемые ошибки: 5xx сервера + временные DNS/сетевые сбои
+                retryable_patterns = [
+                    "503", "502", "500",           # Server errors
+                    "Temporary failure in name resolution",  # DNS
+                    "Name or service not known",   # DNS
+                    "Cannot connect to host",      # Network
+                    "Connection refused",          # Network
+                    "Connection reset",            # Network
+                    "Timeout", "timed out",        # Timeout
+                ]
+                is_retryable = (
+                    any(p in exc_str for p in retryable_patterns)
+                    or isinstance(exc, (TimeoutError, asyncio.TimeoutError))
+                )
+
+                if is_retryable and attempt < max_retries:
+                    delay = retry_delay * (2 ** (attempt - 1))
+                    logger.warning(
+                        "Ошибка Edge TTS (попытка %d/%d): %s. Повтор через %.1f сек...",
+                        attempt, max_retries, exc_str, delay,
+                    )
+                    await asyncio.sleep(delay)
+                    continue
+
+                # Остальные ошибки (4xx, неверный ключ и т.д.) не повторяем
+                logger.error(
+                    "Неисправимая ошибка Edge TTS (попытка %d/%d): %s",
+                    attempt, max_retries, exc_str,
+                )
+                raise
+
+        # Все попытки исчерпаны
+        raise last_exception  # type: ignore[misc]
+
+    async def synthesize_chapter(
+        self,
+        text_segments: List[str],
+        comment_segments: List[Optional[str]],
+        chapter_dir: Path,
+        progress_callback: Optional[Callable[[int, int], None]] = None,
+        detail_callback: Optional[Callable[[int, int, str, str, str], None]] = None,
+    ) -> Path:
+        """Синтез целой главы с комментариями.
+
+        Args:
+            text_segments: Сегменты основного текста.
+            comment_segments: Сегменты комментариев (None если нет).
+            chapter_dir: Директория для временных файлов главы.
+            progress_callback: Колбэк прогресса (текущий, всего).
+            detail_callback: Колбэк с детальной информацией (текущий, всего, текст, голос, бэкенд).
+
+        Returns:
+            Путь к директории с аудиофайлами главы.
+        """
+        chapter_dir.mkdir(parents=True, exist_ok=True)
+        audio_paths: List[Path] = []
+        total = len(text_segments) + len([c for c in comment_segments if c])
+        completed = 0
+
+        def _report_segment(seg_text: str, seg_voice: str):
+            """Отправить детальную информацию о сегменте."""
+            if detail_callback:
+                preview = seg_text[:120].replace("\n", " ")
+                detail_callback(completed + 1, total, preview, seg_voice, "edge")
+
+        for i, text in enumerate(text_segments):
+            # Основной текст
+            _report_segment(text, self.config.main_voice)
+            path = await self.synthesize_segment(
+                text, self.config.main_voice, self.config.main_speed, chapter_dir
+            )
+            audio_paths.append(path)
+            completed += 1
+            if progress_callback:
+                progress_callback(completed, total)
+
+            # Комментарий (если есть для этого сегмента)
+            if i < len(comment_segments) and comment_segments[i]:
+                comment = comment_segments[i]
+                _report_segment(comment, self.config.comment_voice)
+                path = await self.synthesize_segment(
+                    comment, self.config.comment_voice,
+                    self.config.comment_speed, chapter_dir
+                )
+                audio_paths.append(path)
+                completed += 1
+                if progress_callback:
+                    progress_callback(completed, total)
+
+        # Склейка будет выполнена в AudioAssembler
+        return chapter_dir
+
+    async def get_available_voices(self, lang: str = "") -> List[Dict[str, Any]]:
+        """Получение списка доступных голосов Edge TTS.
+
+        Args:
+            lang: Код языка для фильтрации (например, "ru"). Если пусто — все голоса.
+
+        Returns:
+            Список словарей с информацией о голосах.
+        """
+        voices = await edge_tts.list_voices()
+        result = [
+            {
+                "name": v["ShortName"],
+                "locale": v["Locale"],
+                "gender": v["Gender"],
+                "friendly_name": v["FriendlyName"],
+            }
+            for v in voices
+        ]
+        if lang:
+            result = [v for v in result if v["locale"].startswith(lang)]
+        return result
+
+    async def close(self):
+        """Освобождение ресурсов."""
+        pass
