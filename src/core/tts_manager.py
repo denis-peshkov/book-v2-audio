@@ -53,6 +53,7 @@ class TTSConfig:
 BACKEND_NAMES = {
     "edge": "Edge TTS",
     "piper": "Piper (локальный)",
+    "supertonic": "Supertonic 3 (локальный)",
 }
 
 
@@ -78,6 +79,9 @@ class TTSManager:
         elif self.config.backend == "piper":
             from src.core.tts_piper import PiperTTSManager
             self._backend = PiperTTSManager(self.config)
+        elif self.config.backend == "supertonic":
+            from src.core.tts_supertonic import SupertonicTTSManager
+            self._backend = SupertonicTTSManager(self.config)
         else:
             raise ValueError(f"Неизвестный TTS-бэкенд: {self.config.backend}")
 

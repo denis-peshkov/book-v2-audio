@@ -19,7 +19,7 @@ A desktop app (Windows/Linux) that:
 1. Reads an FB2 e-book
 2. Splits it into sentences
 3. Adds AI-generated literary commentary between sentences
-4. Converts everything to speech via **TTS** (Edge TTS cloud or Piper local engine)
+4. Converts everything to speech via **TTS** (Edge TTS cloud, Piper local, or Supertonic 3 local)
 5. Saves as a single MP3 audiobook
 
 Built with Python + CustomTkinter. Supports DeepSeek, ChatGPT, Grok, Qwen.
@@ -37,6 +37,7 @@ The interface is available in **4 languages** — switch instantly on the first 
   - Linux: `sudo apt install ffmpeg`
   - Windows: download from ffmpeg.org and add to PATH
 - (Optional) [piper-tts](https://github.com/rhasspy/piper) — for local CPU-based TTS (no internet needed)
+- (Optional) `pip install supertonic` — for Supertonic 3 (local, high quality, ~305 MB)
 
 ### Install & Run
 
@@ -100,7 +101,7 @@ The app has a **7-step wizard** with multi-language support:
 | 3 | Logo screen |
 | 4 | Pick an FB2 file (shows title, author, chapters) |
 | 5 | Choose what to narrate: all chapters, a range, or one chapter |
-| 6 | Set comment frequency (every N sentences), pick a commenter role, write your own prompt, **and choose TTS engine** (Edge TTS cloud or Piper local) |
+| 6 | Set comment frequency (every N sentences), pick a commenter role, write your own prompt, **and choose TTS engine** (Edge TTS cloud, Piper local, or Supertonic 3 local) |
 | 7 | Review settings and click **Launch** |
 
 During generation, a **detailed progress window** shows:
@@ -145,6 +146,23 @@ Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. De
 
 **Installation:** Download `piper` from [releases](https://github.com/rhasspy/piper/releases) and add it to PATH, or install via `pip install piper-tts` (may require manual build on Linux).
 
+### Supertonic 3 (local, GPU/CPU)
+
+[Supertonic 3](https://github.com/supertone-inc/supertonic) by Supertone Inc. — modern local TTS on ONNX Runtime. Runs on CPU, no GPU needed.
+
+- **No internet required** after initial model download (~305 MB)
+- Modern architecture (flow-matching, ConvNeXt) — crisp, natural speech
+- 31 languages including Russian and English
+- 5-6× faster than real-time even on CPU
+- 10 voices available: 5 female (F1-F5) + 5 male (M1-M5)
+
+| Language | Main Voice (Text) | Commentator Voice |
+|----------|-------------------|-------------------|
+| 🇷🇺 Russian | **F1 — Anna** (female) | **M1 — Porfiry** (male) |
+| 🇬🇧 English | **F1** (female) | **M1** (male) |
+
+**Installation:** `pip install supertonic` — the model downloads automatically on first run.
+
 ---
 
 ## Built-in Commenter Roles
@@ -184,7 +202,7 @@ You can also enter a **custom prompt** for your own role.
 ├── src/
 │   ├── config/                # Settings, API key storage
 │   ├── core/                  # FB2 parser, sentence splitter, AI comments,
-│   │                          # TTS (abstract base + Edge + Piper), audio assembly,
+│   │                          # TTS (abstract base + Edge + Piper + Supertonic 3), audio assembly,
 │   │                          # checkpoints, pipeline orchestrator
 │   ├── ui/                    # CustomTkinter GUI (7 wizard pages, progress window, components)
 │   └── utils/                 # Logging, exceptions
@@ -197,7 +215,7 @@ You can also enter a **custom prompt** for your own role.
 
 Settings are saved to `~/.audiobook-generator/settings.toml` after first run.
 
-You can edit: UI language, book language, AI provider, TTS engine (edge/piper), TTS voices/speed, pause durations, comment frequency, output directory.
+You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic), TTS voices/speed, pause durations, comment frequency, output directory.
 
 API keys are stored securely in your system keyring (with encrypted file fallback).
 
@@ -216,6 +234,9 @@ API keys are stored securely in your system keyring (with encrypted file fallbac
 
 **Piper not found**
 → Install the `piper` binary and add it to PATH, or use Edge TTS instead.
+
+**Supertonic 3 not working / pip install supertonic fails**
+→ Check your Python version (3.11+). In rare cases, `pip install --upgrade pip` may be needed before installing supertonic.
 
 ---
 

@@ -25,7 +25,7 @@ COMMENTS_TEXTS = {
         "role_label": "Роль комментатора:",
         "custom_label": "Или введите свой системный промпт:",
         "tts_label": "TTS движок:",
-        "tts_desc": "Edge TTS — облачный, высокое качество, но возможны сбои.\nPiper — локальный, на CPU, без интернета, чуть ниже качество.",
+        "tts_desc": "Edge TTS — облачный, высокое качество, возможны сбои.\\nPiper — локальный, на CPU, без интернета, чуть ниже качество.\\nSupertonic 3 — локальный, отличное качество, 31 язык, ~305 МБ.",
     },
     "en": {
         "title": "Step 6: Comment Settings",
@@ -194,7 +194,7 @@ class PageComments(ctk.CTkFrame):
         self.tts_backend_var = ctk.StringVar(value=self.settings.tts_backend)
         self.tts_backend_menu = ctk.CTkOptionMenu(
             tts_frame,
-            values=["edge", "piper"],
+            values=["edge", "piper", "supertonic"],
             variable=self.tts_backend_var,
             command=self._on_tts_backend_change,
             width=300,
