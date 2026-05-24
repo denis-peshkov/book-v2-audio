@@ -12,6 +12,7 @@ import tomllib as tomli
 import customtkinter as ctk
 
 from src.config.settings import Settings
+from src.core.tts_manager import resolve_voice
 
 logger = logging.getLogger(__name__)
 
@@ -27,6 +28,10 @@ COMMENTS_TEXTS = {
         "custom_label": "Или введите свой системный промпт:",
         "tts_label": "TTS движок:",
         "tts_desc": "Edge TTS — облачный, высокое качество, возможны сбои.\\nPiper — локальный, на CPU, без интернета, чуть ниже качество.\\nSupertonic 3 — локальный, отличное качество, 31 язык, ~305 МБ.\\nSilero TTS v5 — локальный, лучшее качество русского среди open-source.",
+        "gender_main_label": "Пол основного голоса:",
+        "gender_comment_label": "Пол голоса комментатора:",
+        "gender_male": "Мужской",
+        "gender_female": "Женский",
     },
     "en": {
         "title": "Step 6: Comment Settings",
@@ -38,6 +43,10 @@ COMMENTS_TEXTS = {
         "custom_label": "Or enter your own system prompt:",
         "tts_label": "TTS engine:",
         "tts_desc": "Edge TTS — cloud-based, high quality, but may have outages.\\nPiper — local, CPU-only, no internet needed, slightly lower quality.\\nSupertonic 3 — local, high quality, 31 languages, ~305 MB.\\nSilero TTS v5 — local, best russian quality among open-source.",
+        "gender_main_label": "Main voice gender:",
+        "gender_comment_label": "Comment voice gender:",
+        "gender_male": "Male",
+        "gender_female": "Female",
     },
     "ja": {
         "title": "ステップ6: コメント設定",
@@ -49,6 +58,10 @@ COMMENTS_TEXTS = {
         "custom_label": "または独自のシステムプロンプトを入力:",
         "tts_label": "TTSエンジン:",
         "tts_desc": "Edge TTS — クラウド、高品質だが障害の可能性あり。\\nPiper — ローカル、CPU動作、オフラインでも使用可能。\\nSupertonic 3 — ローカル、高品質、31言語、~305 MB。\\nSilero TTS v5 — ローカル、ロシア語に最適なオープンソースTTS。",
+        "gender_main_label": "本文声の性別:",
+        "gender_comment_label": "コメント声の性別:",
+        "gender_male": "男性",
+        "gender_female": "女性",
     },
     "zh": {
         "title": "步骤6：评论设置",
@@ -60,6 +73,10 @@ COMMENTS_TEXTS = {
         "custom_label": "或输入您自己的系统提示：",
         "tts_label": "TTS引擎：",
         "tts_desc": "Edge TTS — 云端，高质量，但可能中断。\\nPiper — 本地，CPU运行，无需网络，质量稍低。\\nSupertonic 3 — 本地，高质量，31种语言，~305 MB。\\nSilero TTS v5 — 本地，开源中俄语质量最佳。",
+        "gender_main_label": "正文语音性别：",
+        "gender_comment_label": "评论语音性别：",
+        "gender_male": "男",
+        "gender_female": "女",
     },
 }
 
@@ -227,6 +244,60 @@ class PageComments(ctk.CTkFrame):
         )
         self.tts_desc_label.pack(anchor="w", padx=10, pady=(0, 10))
 
+        # --- Пол голоса ---
+        gender_frame = ctk.CTkFrame(self)
+        gender_frame.pack(fill="x", padx=40, pady=10)
+
+        ctk.CTkLabel(
+            gender_frame,
+            text=t["gender_main_label"],
+            font=ctk.CTkFont(size=14),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        gender_inner = ctk.CTkFrame(gender_frame)
+        gender_inner.pack(fill="x", padx=10, pady=(0, 5))
+
+        self.main_gender_var = ctk.StringVar(value=self.settings.main_gender)
+        self.main_gender_male = ctk.CTkRadioButton(
+            gender_inner,
+            text=t["gender_male"],
+            variable=self.main_gender_var,
+            value="male",
+        )
+        self.main_gender_male.pack(side="left", padx=(0, 20))
+        self.main_gender_female = ctk.CTkRadioButton(
+            gender_inner,
+            text=t["gender_female"],
+            variable=self.main_gender_var,
+            value="female",
+        )
+        self.main_gender_female.pack(side="left")
+
+        ctk.CTkLabel(
+            gender_frame,
+            text=t["gender_comment_label"],
+            font=ctk.CTkFont(size=14),
+        ).pack(anchor="w", padx=10, pady=(10, 5))
+
+        gender_comment_inner = ctk.CTkFrame(gender_frame)
+        gender_comment_inner.pack(fill="x", padx=10, pady=(0, 10))
+
+        self.comment_gender_var = ctk.StringVar(value=self.settings.comment_gender)
+        self.comment_gender_male = ctk.CTkRadioButton(
+            gender_comment_inner,
+            text=t["gender_male"],
+            variable=self.comment_gender_var,
+            value="male",
+        )
+        self.comment_gender_male.pack(side="left", padx=(0, 20))
+        self.comment_gender_female = ctk.CTkRadioButton(
+            gender_comment_inner,
+            text=t["gender_female"],
+            variable=self.comment_gender_var,
+            value="female",
+        )
+        self.comment_gender_female.pack(side="left")
+
         # Применяем начальное состояние чекбокса к фреймам
         self._on_enabled_toggle()
 
@@ -309,6 +380,8 @@ class PageComments(ctk.CTkFrame):
             "comment_frequency": frequency,
             "system_prompt": system_prompt,
             "tts_backend": self.tts_backend_var.get(),
+            "main_gender": self.main_gender_var.get(),
+            "comment_gender": self.comment_gender_var.get(),
         }
 
     def validate(self) -> bool:

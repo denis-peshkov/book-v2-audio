@@ -198,7 +198,9 @@ pip install -e .[silero]
 pip install -e .[silero]
 ```
 
-模型（v5_ru）在首次使用时自动下载并缓存到 `~/.cache/torch/hub/`。
+模型（v5_ru）在首次使用时自动下载（到 venv 的 `silero_tts/silero_models/` 目录）— 首次约需一分钟，之后可离线使用。
+
+Silero 自动检测文本语言：**西里尔字母** → 俄语语音（xenia/eugene），**拉丁字母** → 英语语音（lj_16khz）。其他语言（日语、中文）请使用 **Edge TTS** 或 **Supertonic 3**。
 
 ---
 

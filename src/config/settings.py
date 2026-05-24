@@ -31,11 +31,11 @@ class Settings:
     ai_provider: str = "deepseek"
 
     # TTS бэкенд
-    tts_backend: str = "edge"  # "edge" | "piper"
+    tts_backend: str = "edge"  # "edge" | "piper" | "supertonic" | "silero"
 
-    # Голоса TTS
-    main_voice: str = "ru-RU-SvetlanaNeural"
-    comment_voice: str = "ru-RU-DmitryNeural"
+    # Пол голосов TTS (резолвятся в имена через движок + язык книги)
+    main_gender: str = "female"
+    comment_gender: str = "female"
     main_speed: float = 1.0
     comment_speed: float = 1.0
 
@@ -67,31 +67,57 @@ class Settings:
     chapter_end: int = 0
 
 
-# Маппинг старых (несуществующих) голосов на новые
-_VOICE_MIGRATION = {
-    "ru-RU-DariyaNeural": "ru-RU-SvetlanaNeural",
-    "ru-RU-MaxNeural": "ru-RU-DmitryNeural",
+# Определение пола по имени голоса (для миграции со старых версий)
+_KNOWN_FEMALE_VOICES = {
+    "ru-RU-SvetlanaNeural", "ru-RU-DariyaNeural",
+    "en-US-JennyNeural", "en-GB-SoniaNeural",
+    "ja-JP-NanamiNeural",
+    "zh-CN-XiaoxiaoNeural",
+}
+_KNOWN_MALE_VOICES = {
+    "ru-RU-DmitryNeural", "ru-RU-MaxNeural",
+    "en-US-GuyNeural", "en-GB-RyanNeural",
+    "ja-JP-KeitaNeural",
+    "zh-CN-YunxiNeural",
 }
 
 
-def _migrate_voices(settings: Settings) -> Settings:
-    """Миграция устаревших голосов на актуальные.
+def _infer_gender_from_voice(voice_name: str) -> str:
+    """Определить пол по имени голоса (для миграции)."""
+    if voice_name in _KNOWN_FEMALE_VOICES:
+        return "female"
+    if voice_name in _KNOWN_MALE_VOICES:
+        return "male"
+    if "Female" in voice_name or "female" in voice_name:
+        return "female"
+    if "Male" in voice_name or "male" in voice_name:
+        return "male"
+    # Edge: суффикс Neural — пытаемся угадать по первой букве имени
+    # Svetlana, Jenny, Nanami — женские; Dmitry, Guy, Keita — мужские
+    return "female"  # fallback
 
-    Microsoft Edge TTS изменил список доступных голосов.
-    DariyaNeural и MaxNeural больше не существуют.
+
+def _migrate_voices(settings: dict) -> dict:
+    """Миграция старых настроек: main_voice/comment_voice → main_gender/comment_gender.
+
+    Args:
+        settings: Сырой словарь из TOML-файла (ещё не превращён в Settings).
+
+    Returns:
+        Обновлённый словарь без полей main_voice/comment_voice.
     """
-    if settings.main_voice in _VOICE_MIGRATION:
-        logger.info(
-            "Миграция голоса: %s → %s",
-            settings.main_voice, _VOICE_MIGRATION[settings.main_voice],
-        )
-        settings.main_voice = _VOICE_MIGRATION[settings.main_voice]
-    if settings.comment_voice in _VOICE_MIGRATION:
-        logger.info(
-            "Миграция голоса: %s → %s",
-            settings.comment_voice, _VOICE_MIGRATION[settings.comment_voice],
-        )
-        settings.comment_voice = _VOICE_MIGRATION[settings.comment_voice]
+    if "main_voice" in settings and "main_gender" not in settings:
+        old_voice = settings.pop("main_voice")
+        gender = _infer_gender_from_voice(old_voice)
+        settings["main_gender"] = gender
+        logger.info("Миграция main_voice='%s' → main_gender='%s'", old_voice, gender)
+
+    if "comment_voice" in settings and "comment_gender" not in settings:
+        old_voice = settings.pop("comment_voice")
+        gender = _infer_gender_from_voice(old_voice)
+        settings["comment_gender"] = gender
+        logger.info("Миграция comment_voice='%s' → comment_gender='%s'", old_voice, gender)
+
     return settings
 
 
@@ -114,12 +140,14 @@ def load_settings(config_path: Optional[Path] = None) -> Settings:
         with open(path, "rb") as f:
             data = tomli.load(f)
 
+        # Мигрируем старые поля (main_voice/comment_voice → main_gender/comment_gender)
+        data = _migrate_voices(data)
+
         # Фильтруем только известные поля
         known_fields = {k for k in asdict(Settings())}
         filtered_data = {k: v for k, v in data.items() if k in known_fields}
 
         settings = Settings(**filtered_data)
-        settings = _migrate_voices(settings)
         logger.info("Настройки загружены: %s", path)
         return settings
 

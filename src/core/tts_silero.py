@@ -64,16 +64,22 @@ class SileroTTSManager(TTSBackend):
     def __init__(self, config):
         self.config = config
         self._initialized = False
-        self._tts_main = None  # SileroTTS для основного голоса
-        self._tts_comment = None  # SileroTTS для голоса комментатора
+        self._tts_main = None   # SileroTTS для русского текста (основной голос)
+        self._tts_comment = None  # SileroTTS для русского текста (комментатор)
+        self._tts_en_main = None  # SileroTTS для английского текста
         self._sample_rate = 48000
 
         # Маппим голоса из конфига
         self._main_voice = self._resolve_silero_voice(config.main_voice, is_comment=False)
         self._comment_voice = self._resolve_silero_voice(config.comment_voice, is_comment=True)
 
+    def _has_cyrillic(self, text: str) -> bool:
+        """Проверка, есть ли в тексте кириллица."""
+        import re
+        return bool(re.search(r'[а-яА-ЯёЁ]', text))
+
     async def _ensure_initialized(self):
-        """Ленивая инициализация — загрузка модели при первом вызове."""
+        """Ленивая инициализация — загрузка моделей при первом вызове."""
         if self._initialized:
             return
 
@@ -84,8 +90,7 @@ class SileroTTSManager(TTSBackend):
             try:
                 from silero_tts.silero_tts import SileroTTS
 
-                logger.info("Silero: загрузка модели v5_ru (~150 МБ) при первом запуске...")
-
+                logger.info("Silero: загрузка русской модели v5_ru (~150 МБ)...")
                 self._tts_main = SileroTTS(
                     model_id="v5_ru",
                     language="ru",
@@ -105,8 +110,22 @@ class SileroTTSManager(TTSBackend):
                 else:
                     self._tts_comment = self._tts_main
 
+                logger.info("Silero: загрузка английской модели lj_16khz...")
+                try:
+                    self._tts_en_main = SileroTTS(
+                        model_id="v3_en",
+                        language="en",
+                        speaker="lj_16khz",
+                        sample_rate=self._sample_rate,
+                        device="cpu",
+                    )
+                    logger.info("Silero: английская модель загружена (lj_16khz)")
+                except Exception as e:
+                    logger.warning("Silero: не удалось загрузить английскую модель: %s", e)
+                    self._tts_en_main = None
+
                 self._initialized = True
-                logger.info("Silero TTS v5 инициализирован (sample_rate=%d)", self._sample_rate)
+                logger.info("Silero TTS v5 инициализирован")
             except Exception as e:
                 raise RuntimeError(
                     f"Ошибка загрузки Silero TTS: {e}. "
@@ -199,14 +218,38 @@ class SileroTTSManager(TTSBackend):
 
         # Синтезируем
         try:
-            # Выбираем нужный экземпляр TTS по голосу
-            if voice_name == self._comment_voice and self._tts_comment is not None:
-                tts = self._tts_comment
+            # Выбираем модель по языку текста
+            if self._has_cyrillic(text):
+                if voice_name == self._comment_voice and self._tts_comment is not None:
+                    tts = self._tts_comment
+                else:
+                    tts = self._tts_main
             else:
-                tts = self._tts_main
+                # Английский текст — используем английскую модель
+                if self._tts_en_main is not None:
+                    tts = self._tts_en_main
+                else:
+                    # Английской модели нет — тишина
+                    logger.warning(
+                        "Silero: нет английской модели для текста '%s...' — тишина",
+                        text[:60],
+                    )
+                    await self._generate_silence_mp3(mp3_path, duration_sec=0.5)
+                    return mp3_path
 
             # SileroTTS.tts() записывает WAV напрямую
             tts.tts(text, str(wav_path))
+
+            # Проверяем, что WAV не пустой (silero может "успешно" сохранить пустышку
+            # для неподдерживаемого языка или символов)
+            if not wav_path.exists() or wav_path.stat().st_size < 1000:
+                logger.warning(
+                    "Silero: синтез вернул пустой WAV для текста '%s...' — генерирую тишину",
+                    text[:60],
+                )
+                wav_path.unlink(missing_ok=True)
+                await self._generate_silence_mp3(mp3_path, duration_sec=0.5)
+                return mp3_path
 
         except Exception as e:
             logger.error("Silero ошибка синтеза: %s", e)

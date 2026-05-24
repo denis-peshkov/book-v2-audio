@@ -128,16 +128,16 @@ Output: `~/audiobooks/<book_title>.mp3`
 
 ### Edge TTS (default, cloud-based)
 
-Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. Default voices per language:
+Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. Voice is selected automatically based on **book language** and **chosen gender** (Step 6):
 
-| Language | Main Voice (Text) | Commentator Voice |
-|----------|-------------------|-------------------|
-| 🇷🇺 Russian | **Svetlana** (female) | **Dmitry** (male) |
-| 🇬🇧 English | **Jenny** (female) | **Guy** (male) |
-| 🇯🇵 Japanese | **Nanami** (female) | **Keita** (male) |
-| 🇨🇳 Chinese | **Xiaoxiao** (female) | **Yunxi** (male) |
+| Language | Female → | Male → |
+|----------|---------|-------|
+| Russian  | `ru-RU-SvetlanaNeural` | `ru-RU-DmitryNeural` |
+| English  | `en-US-JennyNeural` | `en-US-GuyNeural` |
+| Japanese | `ja-JP-NanamiNeural` | `ja-JP-KeitaNeural` |
+| Chinese  | `zh-CN-XiaoxiaoNeural` | `zh-CN-YunxiNeural` |
 
-**Voices auto-update** when you change the book language on step 1. You can also override them in `~/.audiobook-generator/settings.toml`. Any voice from [the full Edge TTS list](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts) can be used.
+**Voices update automatically** with book language (Step 1) and gender selection (Step 6). Any voice from [the full Edge TTS list](https://learn.microsoft.com/en-us/azure/ai-services/speech-service/language-support?tabs=tts) can be used by editing `~/.audiobook-generator/settings.toml`.
 
 ### Piper (local, CPU)
 
@@ -184,10 +184,10 @@ Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. De
 - Supports SSML for fine-grained control
 - Available voices:
 
-| Language | Main Voice (Text) | Commentator Voice |
-|----------|-------------------|-------------------|
-| 🇷🇺 Russian | **xenia** (female) | **eugene** (male) |
-| 🇬🇧 English | **lj_16khz** (female) | **random** (male) |
+| Language | Female → | Male → |
+|----------|---------|-------|
+| Russian  | `xenia` | `eugene` |
+| English  | `lj_16khz` | `random` |
 
 **Installation:**
 ```bash
@@ -200,6 +200,8 @@ pip install -e .[silero]
 ```
 
 The model (v5_ru) downloads automatically on first use (to your venv's `silero_tts/silero_models/` directory) — this takes about a minute on first run, then works offline.
+
+Silero automatically detects the text language: **Cyrillic** → Russian voice (xenia/eugene), **Latin** → English voice (lj_16khz). For other languages (Japanese, Chinese) please use **Edge TTS** or **Supertonic 3**.
 
 ---
 
@@ -267,7 +269,7 @@ You can also enter a **custom prompt** for your own role.
 
 Settings are saved to `~/.audiobook-generator/settings.toml` after first run.
 
-You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic/silero), TTS voices/speed, pause durations, comment frequency, comment on/off toggle, output directory.
+You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic/silero), voice genders (main_gender, comment_gender), speed, pause durations, comment frequency, comment on/off toggle, output directory.
 
 API keys are stored securely in your system keyring (with encrypted file fallback).
 

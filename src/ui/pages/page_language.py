@@ -10,7 +10,6 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.config.settings import Settings
-from src.core.tts_manager import DEFAULT_VOICES
 
 logger = logging.getLogger(__name__)
 
@@ -136,18 +135,13 @@ class PageLanguage(ctk.CTkFrame):
             self.on_lang_change(lang_code)
 
     def _on_book_lang_change(self, value: str):
-        """Обработчик смены языка книг — обновляет голоса по умолчанию."""
+        """Обработчик смены языка книг — обновляет язык, голоса подберутся по полу."""
         lang_code = LANG_MAP.get(value, "ru")
         self.settings.book_lang = lang_code
 
-        # Обновляем голоса TTS в соответствии с языком книг
-        voices = DEFAULT_VOICES.get(lang_code, DEFAULT_VOICES["ru"])
-        self.settings.main_voice = voices["main"]
-        self.settings.comment_voice = voices["comment"]
-
         logger.info(
-            "Язык книг изменён на %s, голоса: main=%s, comment=%s",
-            lang_code, voices["main"], voices["comment"],
+            "Язык книг изменён на %s (голоса определяются по полу и движку при запуске)",
+            lang_code,
         )
 
     def _apply_ui_language(self, lang_code: str):

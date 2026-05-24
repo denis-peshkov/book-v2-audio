@@ -15,25 +15,49 @@ from src.core.tts_base import TTSBackend
 logger = logging.getLogger(__name__)
 
 
-# Голоса по умолчанию для разных языков
-DEFAULT_VOICES = {
-    "ru": {
-        "main": "ru-RU-SvetlanaNeural",
-        "comment": "ru-RU-DmitryNeural",
+# Маппинг (движок, язык, пол) → имя голоса
+BACKEND_VOICES = {
+    "edge": {
+        "ru": {"male": "ru-RU-DmitryNeural", "female": "ru-RU-SvetlanaNeural"},
+        "en": {"male": "en-US-GuyNeural", "female": "en-US-JennyNeural"},
+        "ja": {"male": "ja-JP-KeitaNeural", "female": "ja-JP-NanamiNeural"},
+        "zh": {"male": "zh-CN-YunxiNeural", "female": "zh-CN-XiaoxiaoNeural"},
     },
-    "en": {
-        "main": "en-US-JennyNeural",
-        "comment": "en-US-GuyNeural",
+    "silero": {
+        "ru": {"male": "eugene", "female": "xenia"},
+        "en": {"male": "random", "female": "lj_16khz"},
     },
-    "ja": {
-        "main": "ja-JP-NanamiNeural",
-        "comment": "ja-JP-KeitaNeural",
+    "piper": {
+        "ru": {"male": "ru_RU-dmitri-medium", "female": "ru_RU-irina-medium"},
+        "en": {"male": "en_US-joe-medium", "female": "en_US-amy-medium"},
+        # Для китайского в Piper только женские голоса
+        "zh": {"male": "zh_CN-xiao_ya-medium", "female": "zh_CN-xiao_ya-medium"},
     },
-    "zh": {
-        "main": "zh-CN-XiaoxiaoNeural",
-        "comment": "zh-CN-YunxiNeural",
+    "supertonic": {
+        "ru": {"male": "M1", "female": "F1"},
+        "en": {"male": "M1", "female": "F1"},
+        "ja": {"male": "M1", "female": "F1"},
+        "zh": {"male": "M1", "female": "F1"},
     },
 }
+# Fallback: если язык не найден — берём английский
+_FALLBACK_LANG = "en"
+
+
+def resolve_voice(backend: str, book_lang: str, gender: str) -> str:
+    """Преобразовать (движок, язык книги, пол) в конкретное имя голоса.
+
+    Args:
+        backend: Имя TTS-движка ("edge", "silero", "piper", "supertonic").
+        book_lang: Код языка книги ("ru", "en", "ja", "zh").
+        gender: Пол ("male" или "female").
+
+    Returns:
+        Имя голоса (например, "ru-RU-DmitryNeural" или "eugene").
+    """
+    voices_for_backend = BACKEND_VOICES.get(backend, BACKEND_VOICES["edge"])
+    voices_for_lang = voices_for_backend.get(book_lang, voices_for_backend.get(_FALLBACK_LANG, {}))
+    return voices_for_lang.get(gender, voices_for_lang.get("female", next(iter(voices_for_lang.values()))))
 
 
 @dataclass

@@ -19,7 +19,7 @@ from src.config.settings import Settings, load_settings, save_settings
 from src.config.key_manager import KeyManager
 from src.core.comment_manager import CommentConfig
 from src.core.pipeline import AppConfig, Pipeline
-from src.core.tts_manager import TTSConfig
+from src.core.tts_manager import TTSConfig, resolve_voice
 from src.ui.progress_window import ProgressWindow
 from src.ui.wizard import WizardController
 
@@ -305,8 +305,16 @@ class AudiobookApp(ctk.CTk):
             )
             tts_config = TTSConfig(
                 backend=self.settings.tts_backend,
-                main_voice=self.settings.main_voice,
-                comment_voice=self.settings.comment_voice,
+                main_voice=resolve_voice(
+                    self.settings.tts_backend,
+                    self.settings.book_lang,
+                    self.settings.main_gender,
+                ),
+                comment_voice=resolve_voice(
+                    self.settings.tts_backend,
+                    self.settings.book_lang,
+                    self.settings.comment_gender,
+                ),
                 main_speed=self.settings.main_speed,
                 comment_speed=self.settings.comment_speed,
                 pause_before_comment=self.settings.pause_before_comment,

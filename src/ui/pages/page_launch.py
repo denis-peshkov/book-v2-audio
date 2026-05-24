@@ -11,6 +11,7 @@ from typing import Callable, Optional
 import customtkinter as ctk
 
 from src.config.settings import Settings
+from src.core.tts_manager import resolve_voice
 
 logger = logging.getLogger(__name__)
 
@@ -150,8 +151,12 @@ class PageLaunch(ctk.CTkFrame):
             (t["lang_label"], self._lang_display(self.settings.book_lang)),
             (t["provider_label"], self.settings.ai_provider.capitalize()),
             (t["freq_label"], self._comment_summary()),
-            (t["voice_main_label"], self.settings.main_voice),
-            (t["voice_comment_label"], self.settings.comment_voice),
+            (t["voice_main_label"], resolve_voice(
+                self.settings.tts_backend, self.settings.book_lang, self.settings.main_gender,
+            )),
+            (t["voice_comment_label"], resolve_voice(
+                self.settings.tts_backend, self.settings.book_lang, self.settings.comment_gender,
+            )),
             (t["tts_label"], tts_backend_display),
             (t["output_label"], self.settings.output_dir),
         ]
