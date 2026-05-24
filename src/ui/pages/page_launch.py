@@ -22,8 +22,9 @@ LAUNCH_TEXTS = {
         "summary_title": "Сводка настроек:",
         "lang_label": "Язык книг",
         "provider_label": "AI-провайдер",
-        "freq_label": "Частота комментариев",
+        "freq_label": "Комментарии",
         "freq_format": "каждые {} предложений",
+        "freq_off": "Отключены",
         "voice_main_label": "Голос текста",
         "voice_comment_label": "Голос комментатора",
         "output_label": "Путь сохранения",
@@ -38,8 +39,9 @@ LAUNCH_TEXTS = {
         "summary_title": "Settings summary:",
         "lang_label": "Book language",
         "provider_label": "AI Provider",
-        "freq_label": "Comment frequency",
+        "freq_label": "Comments",
         "freq_format": "every {} sentences",
+        "freq_off": "Disabled",
         "voice_main_label": "Text voice",
         "voice_comment_label": "Comment voice",
         "output_label": "Output path",
@@ -54,8 +56,9 @@ LAUNCH_TEXTS = {
         "summary_title": "設定概要:",
         "lang_label": "書籍の言語",
         "provider_label": "AIプロバイダー",
-        "freq_label": "コメント頻度",
+        "freq_label": "コメント",
         "freq_format": "{}文ごと",
+        "freq_off": "無効",
         "voice_main_label": "テキストの声",
         "voice_comment_label": "コメントの声",
         "output_label": "出力先",
@@ -69,8 +72,9 @@ LAUNCH_TEXTS = {
         "summary_title": "设置摘要：",
         "lang_label": "书籍语言",
         "provider_label": "AI提供商",
-        "freq_label": "评论频率",
+        "freq_label": "评论",
         "freq_format": "每{}句",
+        "freq_off": "已禁用",
         "voice_main_label": "正文语音",
         "voice_comment_label": "评论语音",
         "output_label": "输出路径",
@@ -84,6 +88,8 @@ LAUNCH_TEXTS = {
 TTS_BACKEND_NAMES = {
     "edge": "Edge TTS",
     "piper": "Piper (локальный)",
+    "supertonic": "Supertonic 3 (локальный)",
+    "silero": "Silero TTS (локальный)",
 }
 
 
@@ -143,7 +149,7 @@ class PageLaunch(ctk.CTkFrame):
         items = [
             (t["lang_label"], self._lang_display(self.settings.book_lang)),
             (t["provider_label"], self.settings.ai_provider.capitalize()),
-            (t["freq_label"], t["freq_format"].format(self.settings.comment_frequency)),
+            (t["freq_label"], self._comment_summary()),
             (t["voice_main_label"], self.settings.main_voice),
             (t["voice_comment_label"], self.settings.comment_voice),
             (t["tts_label"], tts_backend_display),
@@ -202,6 +208,16 @@ class PageLaunch(ctk.CTkFrame):
             "zh": "中文",
         }
         return mapping.get(code, code)
+
+    def _comment_summary(self) -> str:
+        """Отображение статуса комментариев."""
+        if not self.settings.comment_enabled:
+            lang = self.settings.ui_lang
+            t = LAUNCH_TEXTS.get(lang, LAUNCH_TEXTS["ru"])
+            return t["freq_off"]
+        lang = self.settings.ui_lang
+        t = LAUNCH_TEXTS.get(lang, LAUNCH_TEXTS["ru"])
+        return t["freq_format"].format(self.settings.comment_frequency)
 
     def _get_launch_text(self) -> str:
         """Получение текста кнопки запуска."""

@@ -35,6 +35,7 @@ PROVIDER_MODELS = {
 @dataclass
 class CommentConfig:
     """Конфигурация генерации комментариев."""
+    enabled: bool = True
     provider: str = "deepseek"  # deepseek, chatgpt, grok, qwen
     api_key: str = ""
     system_prompt: str = ""

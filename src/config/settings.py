@@ -46,6 +46,7 @@ class Settings:
     chapter_pause: float = 1.5
 
     # Комментарии
+    comment_enabled: bool = True
     comment_frequency: int = 5
     max_concurrent: int = 5
     system_prompt: str = ""

@@ -54,6 +54,12 @@ dependencies = [
 supertonic = [
     "supertonic>=1.0.0",
 ]
+silero = [
+    "silero-tts>=0.0.5",
+    "scipy>=1.10.0",
+    "torch>=2.0.0",
+    "torchaudio>=2.0.0",
+]
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",

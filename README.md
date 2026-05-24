@@ -1,6 +1,6 @@
 # Book v2 Audio
 
-**FB2 → audiobook with AI-powered Porfiry commentary.**
+**FB2 → audiobook with AI-powered commentary.**
 ![alt text](info_en.png)
 
 [![Python 3.11+](https://img.shields.io/badge/python-3.11%2B-blue)](https://www.python.org/)
@@ -18,8 +18,8 @@ A desktop app (Windows/Linux) that:
 
 1. Reads an FB2 e-book
 2. Splits it into sentences
-3. Adds AI-generated literary commentary between sentences
-4. Converts everything to speech via **TTS** (Edge TTS cloud, Piper local, or Supertonic 3 local)
+3. **Optionally** adds AI-generated commentary between sentences (can be disabled)
+4. Converts everything to speech via **TTS** (Edge TTS, Piper, Supertonic 3, or Silero TTS v5)
 5. Saves as a single MP3 audiobook
 
 Built with Python + CustomTkinter. Supports DeepSeek, ChatGPT, Grok, Qwen.
@@ -37,7 +37,8 @@ The interface is available in **4 languages** — switch instantly on the first 
   - Linux: `sudo apt install ffmpeg`
   - Windows: download from ffmpeg.org and add to PATH
 - (Optional) [piper-tts](https://github.com/rhasspy/piper) — for local CPU-based TTS (no internet needed)
-- (Optional) `pip install supertonic` — for Supertonic 3 (local, high quality, ~305 MB)
+- (Optional) `pip install -e .[supertonic]` — for Supertonic 3 (local, high quality, 31 languages, ~305 MB)
+- (Optional) `pip install -e .[silero]` — for Silero TTS v5 (local, best Russian open-source quality, ~150 MB, requires PyTorch)
 
 ### Install & Run
 
@@ -49,16 +50,25 @@ python3 -m venv venv
 source venv/bin/activate   # Linux
 # venv\Scripts\activate    # Windows
 
-# 3. Install the app and all dependencies
+# 3. Install the app and core dependencies
 pip install -e .
 
-# 4. (Optional) Install spaCy models for better sentence splitting
+# 4. (Optional) Install optional TTS engines
+pip install -e .[supertonic]  # Supertonic 3
+
+# For Silero on CPU (recommended — installs PyTorch + all deps):
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install -e .[silero]
+
+#   (both commands above are required for Silero; skip if you don't need it)
+
+# 5. (Optional) Install spaCy models for better sentence splitting
 python -m spacy download ru_core_news_sm  # Russian
 python -m spacy download en_core_web_sm   # English
 python -m spacy download ja_core_news_sm  # Japanese
 python -m spacy download zh_core_web_sm   # Chinese
 
-# 5. Run
+# 6. Run
 python main.py
 ```
 
@@ -66,7 +76,7 @@ Or use the Makefile:
 
 ```bash
 make install   # steps 1-3
-make run       # step 5
+make run       # step 6
 ```
 
 ---
@@ -97,11 +107,11 @@ The app has a **7-step wizard** with multi-language support:
 | Step | What you do |
 |------|-------------|
 | 1 | Select **UI language** (changes instantly across all pages) and **book language** (auto-selects matching TTS voices) |
-| 2 | Choose AI provider (DeepSeek/ChatGPT/Grok/Qwen) and enter API key |
+| 2 | Choose AI provider (DeepSeek/ChatGPT/Grok/Qwen) and enter API key. **If you don't need AI comments — just click Next, the key is optional** |
 | 3 | Logo screen |
 | 4 | Pick an FB2 file (shows title, author, chapters) |
 | 5 | Choose what to narrate: all chapters, a range, or one chapter |
-| 6 | Set comment frequency (every N sentences), pick a commenter role, write your own prompt, **and choose TTS engine** (Edge TTS cloud, Piper local, or Supertonic 3 local) |
+| 6 | Toggle **AI comments on/off** (checkbox). Set comment frequency, pick a commenter role, and **choose TTS engine** (Edge TTS, Piper, Supertonic 3, or Silero TTS v5) |
 | 7 | Review settings and click **Launch** |
 
 During generation, a **detailed progress window** shows:
@@ -161,7 +171,47 @@ Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. De
 | 🇷🇺 Russian | **F1 — Anna** (female) | **M1 — Porfiry** (male) |
 | 🇬🇧 English | **F1** (female) | **M1** (male) |
 
-**Installation:** `pip install supertonic` — the model downloads automatically on first run.
+**Installation:** `pip install -e .[supertonic]` — the model downloads automatically on first run (~305 MB).
+
+### Silero TTS v5 (local, CPU)
+
+[Silero TTS v5](https://github.com/snakers4/silero-models) — pre-trained TTS models by the Silero team. The best open-source quality for Russian language.
+
+- **No internet required** after initial model download (~150 MB)
+- Automatic stress marks and homograph support (Russian-only)
+- Built on FastSpeech 2 architecture — excellent clarity
+- UTMOS 3.04 (near-human naturalness for Russian)
+- Supports SSML for fine-grained control
+- Available voices:
+
+| Language | Main Voice (Text) | Commentator Voice |
+|----------|-------------------|-------------------|
+| 🇷🇺 Russian | **xenia** (female) | **eugene** (male) |
+| 🇬🇧 English | **lj_16khz** (female) | **random** (male) |
+
+**Installation:**
+```bash
+# CPU (recommended for most users):
+pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu
+pip install -e .[silero]
+
+# If you have a CUDA GPU:
+pip install -e .[silero]
+```
+
+The model (v5_ru) downloads automatically on first use (to your venv's `silero_tts/silero_models/` directory) — this takes about a minute on first run, then works offline.
+
+---
+
+## 🎯 Fully Offline Mode
+
+You can run the entire pipeline **without internet access**:
+
+1. On **Step 2**: skip the API key (AI comments won't be generated)
+2. On **Step 6**: uncheck **"Generate AI comments"**
+3. Select a local TTS engine: **Piper**, **Supertonic 3**, or **Silero TTS v5**
+
+No API calls, no cloud dependencies. Just FB2 parsing + local TTS → audiobook.
 
 ---
 
@@ -182,10 +232,12 @@ You can also enter a **custom prompt** for your own role.
 
 | Provider | API Key | Base URL |
 |----------|---------|----------|
-| DeepSeek | Required | `https://api.deepseek.com` |
-| ChatGPT (OpenAI) | Required | `https://api.openai.com/v1` |
-| Grok (xAI) | Required | `https://api.x.ai/v1` |
-| Qwen (Alibaba Cloud) | Required | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+| DeepSeek | Required (for comments) | `https://api.deepseek.com` |
+| ChatGPT (OpenAI) | Required (for comments) | `https://api.openai.com/v1` |
+| Grok (xAI) | Required (for comments) | `https://api.x.ai/v1` |
+| Qwen (Alibaba Cloud) | Required (for comments) | `https://dashscope.aliyuncs.com/compatible-mode/v1` |
+
+**Note:** API keys are only needed if you use AI comments. For offline mode, skip this step entirely.
 
 ---
 
@@ -202,8 +254,8 @@ You can also enter a **custom prompt** for your own role.
 ├── src/
 │   ├── config/                # Settings, API key storage
 │   ├── core/                  # FB2 parser, sentence splitter, AI comments,
-│   │                          # TTS (abstract base + Edge + Piper + Supertonic 3), audio assembly,
-│   │                          # checkpoints, pipeline orchestrator
+│   │                          # TTS (abstract base + Edge + Piper + Supertonic 3 + Silero),
+│   │                          # audio assembly, checkpoints, pipeline orchestrator
 │   ├── ui/                    # CustomTkinter GUI (7 wizard pages, progress window, components)
 │   └── utils/                 # Logging, exceptions
 └── tests/
@@ -215,7 +267,7 @@ You can also enter a **custom prompt** for your own role.
 
 Settings are saved to `~/.audiobook-generator/settings.toml` after first run.
 
-You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic), TTS voices/speed, pause durations, comment frequency, output directory.
+You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic/silero), TTS voices/speed, pause durations, comment frequency, comment on/off toggle, output directory.
 
 API keys are stored securely in your system keyring (with encrypted file fallback).
 
@@ -230,13 +282,17 @@ API keys are stored securely in your system keyring (with encrypted file fallbac
 → Install ffmpeg: `sudo apt install ffmpeg` (Linux) or download from ffmpeg.org (Windows)
 
 **Edge TTS fails with 503 / DNS errors**
-→ Try switching to **Piper** (local engine) on step 6. It doesn't need internet.
+→ Try switching to a local engine (**Piper**, **Supertonic 3**, or **Silero**) on step 6.
 
 **Piper not found**
-→ Install the `piper` binary and add it to PATH, or use Edge TTS instead.
+→ Install the `piper` binary and add it to PATH, or use another engine.
 
 **Supertonic 3 not working / pip install supertonic fails**
-→ Check your Python version (3.11+). In rare cases, `pip install --upgrade pip` may be needed before installing supertonic.
+→ Check your Python version (3.11+). In rare cases, `pip install --upgrade pip` may be needed.
+
+**Silero TTS v5 not working / torch import fails**
+→ Make sure PyTorch is installed: `pip install torch torchaudio --index-url https://download.pytorch.org/whl/cpu`
+→ On first run, the model downloads automatically (~150 MB) — this may take a minute.
 
 ---
 

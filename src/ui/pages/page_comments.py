@@ -20,42 +20,46 @@ COMMENTS_TEXTS = {
     "ru": {
         "title": "Шаг 6: Настройка комментариев",
         "desc": "Настройте частоту комментариев и выберите роль комментатора",
+        "enabled_label": "Генерировать AI-комментарии",
         "freq_label": "Частота комментирования:",
         "freq_format": "каждые {} предложений",
         "role_label": "Роль комментатора:",
         "custom_label": "Или введите свой системный промпт:",
         "tts_label": "TTS движок:",
-        "tts_desc": "Edge TTS — облачный, высокое качество, возможны сбои.\\nPiper — локальный, на CPU, без интернета, чуть ниже качество.\\nSupertonic 3 — локальный, отличное качество, 31 язык, ~305 МБ.",
+        "tts_desc": "Edge TTS — облачный, высокое качество, возможны сбои.\\nPiper — локальный, на CPU, без интернета, чуть ниже качество.\\nSupertonic 3 — локальный, отличное качество, 31 язык, ~305 МБ.\\nSilero TTS v5 — локальный, лучшее качество русского среди open-source.",
     },
     "en": {
         "title": "Step 6: Comment Settings",
         "desc": "Set comment frequency and choose a commentator role",
+        "enabled_label": "Generate AI comments",
         "freq_label": "Comment frequency:",
         "freq_format": "every {} sentences",
         "role_label": "Commentator role:",
         "custom_label": "Or enter your own system prompt:",
         "tts_label": "TTS engine:",
-        "tts_desc": "Edge TTS — cloud-based, high quality, but may have outages.\nPiper — local, CPU-only, no internet needed, slightly lower quality.",
+        "tts_desc": "Edge TTS — cloud-based, high quality, but may have outages.\\nPiper — local, CPU-only, no internet needed, slightly lower quality.\\nSupertonic 3 — local, high quality, 31 languages, ~305 MB.\\nSilero TTS v5 — local, best russian quality among open-source.",
     },
     "ja": {
         "title": "ステップ6: コメント設定",
         "desc": "コメント頻度とコメンテーターの役割を設定してください",
+        "enabled_label": "AIコメントを生成",
         "freq_label": "コメント頻度:",
         "freq_format": "{}文ごと",
         "role_label": "コメンテーターの役割:",
         "custom_label": "または独自のシステムプロンプトを入力:",
         "tts_label": "TTSエンジン:",
-        "tts_desc": "Edge TTS — クラウド、高品質だが障害の可能性あり。\nPiper — ローカル、CPU動作、オフラインでも使用可能。",
+        "tts_desc": "Edge TTS — クラウド、高品質だが障害の可能性あり。\\nPiper — ローカル、CPU動作、オフラインでも使用可能。\\nSupertonic 3 — ローカル、高品質、31言語、~305 MB。\\nSilero TTS v5 — ローカル、ロシア語に最適なオープンソースTTS。",
     },
     "zh": {
         "title": "步骤6：评论设置",
         "desc": "设置评论频率并选择评论者角色",
+        "enabled_label": "生成AI评论",
         "freq_label": "评论频率：",
         "freq_format": "每{}句",
         "role_label": "评论者角色：",
         "custom_label": "或输入您自己的系统提示：",
         "tts_label": "TTS引擎：",
-        "tts_desc": "Edge TTS — 云端，高质量，但可能中断。\nPiper — 本地，CPU运行，无需网络，质量稍低。",
+        "tts_desc": "Edge TTS — 云端，高质量，但可能中断。\\nPiper — 本地，CPU运行，无需网络，质量稍低。\\nSupertonic 3 — 本地，高质量，31种语言，~305 MB。\\nSilero TTS v5 — 本地，开源中俄语质量最佳。",
     },
 }
 
@@ -96,19 +100,30 @@ class PageComments(ctk.CTkFrame):
             font=ctk.CTkFont(size=13),
             text_color="gray",
         )
-        desc.pack(pady=(0, 20))
+        desc.pack(pady=(0, 10))
+
+        # Чекбокс включения комментариев
+        self.comments_enabled_var = ctk.BooleanVar(value=self.settings.comment_enabled)
+        self.enabled_check = ctk.CTkCheckBox(
+            self,
+            text=t["enabled_label"],
+            variable=self.comments_enabled_var,
+            command=self._on_enabled_toggle,
+            font=ctk.CTkFont(size=14),
+        )
+        self.enabled_check.pack(anchor="w", padx=40, pady=(0, 10))
 
         # Частота комментирования
-        freq_frame = ctk.CTkFrame(self)
-        freq_frame.pack(fill="x", padx=40, pady=10)
+        self.freq_frame = ctk.CTkFrame(self)
+        self.freq_frame.pack(fill="x", padx=40, pady=10)
 
         ctk.CTkLabel(
-            freq_frame,
+            self.freq_frame,
             text=t["freq_label"],
             font=ctk.CTkFont(size=14),
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
-        freq_inner = ctk.CTkFrame(freq_frame)
+        freq_inner = ctk.CTkFrame(self.freq_frame)
         freq_inner.pack(fill="x", padx=10, pady=(0, 10))
 
         self.frequency_var = ctk.StringVar(value=str(self.settings.comment_frequency))
@@ -131,18 +146,18 @@ class PageComments(ctk.CTkFrame):
         self.freq_label.pack(side="left")
 
         # Выбор роли комментатора
-        role_frame = ctk.CTkFrame(self)
-        role_frame.pack(fill="x", padx=40, pady=10)
+        self.role_frame = ctk.CTkFrame(self)
+        self.role_frame.pack(fill="x", padx=40, pady=10)
 
         ctk.CTkLabel(
-            role_frame,
+            self.role_frame,
             text=t["role_label"],
             font=ctk.CTkFont(size=14),
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         self.role_var = ctk.StringVar(value="")
         self.role_menu = ctk.CTkOptionMenu(
-            role_frame,
+            self.role_frame,
             values=[],
             variable=self.role_var,
             command=self._on_role_change,
@@ -152,7 +167,7 @@ class PageComments(ctk.CTkFrame):
 
         # Описание роли
         self.role_desc_label = ctk.CTkLabel(
-            role_frame,
+            self.role_frame,
             text="",
             font=ctk.CTkFont(size=12),
             text_color="gray",
@@ -162,17 +177,17 @@ class PageComments(ctk.CTkFrame):
         self.role_desc_label.pack(anchor="w", padx=10, pady=(0, 10))
 
         # Свой промпт
-        custom_frame = ctk.CTkFrame(self)
-        custom_frame.pack(fill="x", padx=40, pady=10)
+        self.custom_frame = ctk.CTkFrame(self)
+        self.custom_frame.pack(fill="x", padx=40, pady=10)
 
         ctk.CTkLabel(
-            custom_frame,
+            self.custom_frame,
             text=t["custom_label"],
             font=ctk.CTkFont(size=14),
         ).pack(anchor="w", padx=10, pady=(10, 5))
 
         self.custom_prompt_text = ctk.CTkTextbox(
-            custom_frame,
+            self.custom_frame,
             height=100,
             width=500,
         )
@@ -194,7 +209,7 @@ class PageComments(ctk.CTkFrame):
         self.tts_backend_var = ctk.StringVar(value=self.settings.tts_backend)
         self.tts_backend_menu = ctk.CTkOptionMenu(
             tts_frame,
-            values=["edge", "piper", "supertonic"],
+            values=["edge", "piper", "supertonic", "silero"],
             variable=self.tts_backend_var,
             command=self._on_tts_backend_change,
             width=300,
@@ -211,6 +226,9 @@ class PageComments(ctk.CTkFrame):
             justify="left",
         )
         self.tts_desc_label.pack(anchor="w", padx=10, pady=(0, 10))
+
+        # Применяем начальное состояние чекбокса к фреймам
+        self._on_enabled_toggle()
 
     def _load_prompts(self):
         """Загрузка заготовок промптов из TOML-файла."""
@@ -262,6 +280,19 @@ class PageComments(ctk.CTkFrame):
                 self.custom_prompt_text.insert("1.0", prompt_data.get("text", ""))
                 break
 
+    def _on_enabled_toggle(self):
+        """Обработчик переключения чекбокса генерации комментариев."""
+        enabled = self.comments_enabled_var.get()
+        state = "normal" if enabled else "disabled"
+        for widget in [self.freq_frame, self.role_frame, self.custom_frame]:
+            for child in widget.winfo_children():
+                if isinstance(child, (ctk.CTkSlider, ctk.CTkOptionMenu, ctk.CTkTextbox, ctk.CTkLabel)):
+                    child.configure(text_color=("gray" if not enabled else None))
+                if isinstance(child, (ctk.CTkSlider, ctk.CTkOptionMenu)):
+                    child.configure(state=state)
+                if isinstance(child, ctk.CTkTextbox):
+                    child.configure(state=state)
+
     def _on_tts_backend_change(self, backend: str):
         """Обработчик выбора TTS движка."""
         lang = self.settings.ui_lang
@@ -274,6 +305,7 @@ class PageComments(ctk.CTkFrame):
         system_prompt = self.custom_prompt_text.get("1.0", "end-1c").strip()
 
         return {
+            "comment_enabled": self.comments_enabled_var.get(),
             "comment_frequency": frequency,
             "system_prompt": system_prompt,
             "tts_backend": self.tts_backend_var.get(),

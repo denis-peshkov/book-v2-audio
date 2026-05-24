@@ -15,7 +15,7 @@ from src.config.key_manager import KeyManager
 API_TEXTS = {
     "ru": {
         "title": "Шаг 2: AI-провайдер и API-ключ",
-        "desc": "Выберите провайдера для генерации комментариев и введите API-ключ",
+        "desc": "Выберите провайдера для генерации AI-комментариев.\nЕсли комментарии не нужны — просто нажмите «Далее», ключ не обязателен.",
         "provider_label": "AI-провайдер:",
         "key_label": "API-ключ:",
         "key_placeholder": "Введите API-ключ...",
@@ -25,7 +25,7 @@ API_TEXTS = {
     },
     "en": {
         "title": "Step 2: AI Provider & API Key",
-        "desc": "Select provider for comment generation and enter API key",
+        "desc": "Select provider for AI comment generation.\nIf you don't need comments — just click «Next», the key is optional.",
         "provider_label": "AI Provider:",
         "key_label": "API Key:",
         "key_placeholder": "Enter API key...",
@@ -35,7 +35,7 @@ API_TEXTS = {
     },
     "ja": {
         "title": "ステップ2: AIプロバイダーとAPIキー",
-        "desc": "コメント生成のプロバイダーを選択し、APIキーを入力してください",
+        "desc": "AIコメント生成のプロバイダーを選択します。\nコメントが不要な場合は「次へ」をクリックしてください。キーは必須ではありません。",
         "provider_label": "AIプロバイダー:",
         "key_label": "APIキー:",
         "key_placeholder": "APIキーを入力...",
@@ -44,7 +44,7 @@ API_TEXTS = {
     },
     "zh": {
         "title": "步骤2：AI提供商和API密钥",
-        "desc": "选择用于生成评论的提供商并输入API密钥",
+        "desc": "选择用于生成AI评论的提供商。\n如果不需要评论，只需点击「下一步」，密钥不是必需的。",
         "provider_label": "AI提供商：",
         "key_label": "API密钥：",
         "key_placeholder": "输入API密钥...",

@@ -171,16 +171,19 @@ class Pipeline:
                     logger.warning("Глава %d пуста, пропуск", chapter_num + 1)
                     continue
 
-                # Генерация комментариев
-                self._report(
-                    progress_callback,
-                    f"Глава {chapter_num + 1}/{total_chapters}: генерация комментариев...",
-                    chapter_progress + 0.05,
-                )
-                comments = await self.comment_manager.generate_all(
-                    sentences,
-                    progress_callback=None,
-                )
+                # Генерация комментариев (если включены)
+                if self.config.comment_config.enabled:
+                    self._report(
+                        progress_callback,
+                        f"Глава {chapter_num + 1}/{total_chapters}: генерация комментариев...",
+                        chapter_progress + 0.05,
+                    )
+                    comments = await self.comment_manager.generate_all(
+                        sentences,
+                        progress_callback=None,
+                    )
+                else:
+                    comments = [None] * len(sentences)
 
                 # Синтез речи
                 self._report(

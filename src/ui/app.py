@@ -296,6 +296,7 @@ class AudiobookApp(ctk.CTk):
 
             # Создаём вложенные конфиги
             comment_config = CommentConfig(
+                enabled=self.settings.comment_enabled,
                 provider=self.settings.ai_provider,
                 api_key=api_key,
                 system_prompt=self.settings.system_prompt,
