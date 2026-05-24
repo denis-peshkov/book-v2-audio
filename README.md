@@ -111,7 +111,7 @@ The app has a **7-step wizard** with multi-language support:
 | 3 | Logo screen |
 | 4 | Pick an FB2 file (shows title, author, chapters) |
 | 5 | Choose what to narrate: all chapters, a range, or one chapter |
-| 6 | Toggle **AI comments on/off** (checkbox). Set comment frequency, pick a commenter role, and **choose TTS engine** (Edge TTS, Piper, Supertonic 3, or Silero TTS v5) |
+| 6 | Toggle **AI comments on/off** (checkbox). Set comment frequency, pick a commenter role, **choose TTS engine** (Edge TTS, Piper, Supertonic 3, or Silero TTS v5), and **pick voice gender** for main text and commentator ♂/♀ |
 | 7 | Review settings and click **Launch** |
 
 During generation, a **detailed progress window** shows:
@@ -148,11 +148,13 @@ Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. Vo
 - Slightly lower quality than Edge TTS, but completely stable
 - Available voices:
 
-| Language | Voices |
-|----------|--------|
-| 🇷🇺 Russian | **irina** (female), **denis** (male), **dmitri** (male), **ruslan** (male) |
-| 🇬🇧 English | **less** (female), **amy** (female), **joe** (male), **sam** (male), **ryan** (male), **norman** (male), **kristin** (female), **kusal** (male) |
-| 🇨🇳 Chinese | **chaowen** (female), **huayan** (female), **xiao_ya** (female) |
+| Language | Female → | Male → |
+|----------|---------|-------|
+| Russian  | `ru_RU-irina-medium` | `ru_RU-dmitri-medium` |
+| English  | `en_US-amy-medium` | `en_US-joe-medium` |
+| Chinese  | `zh_CN-xiao_ya-medium` | `zh_CN-xiao_ya-medium`* |
+
+\*Chinese Piper has only female voices; male selection falls back to `xiao_ya`.|
 
 **Installation:** Download `piper` from [releases](https://github.com/rhasspy/piper/releases) and add it to PATH, or install via `pip install piper-tts` (may require manual build on Linux).
 
@@ -164,12 +166,12 @@ Uses **free** Microsoft Edge TTS voices. High quality, but requires internet. Vo
 - Modern architecture (flow-matching, ConvNeXt) — crisp, natural speech
 - 31 languages including Russian and English
 - 5-6× faster than real-time even on CPU
-- 10 voices available: 5 female (F1-F5) + 5 male (M1-M5)
+Voice is selected automatically by gender: female → F1–F5, male → M1–M5. You can override in `~/.audiobook-generator/settings.toml`.
 
-| Language | Main Voice (Text) | Commentator Voice |
-|----------|-------------------|-------------------|
-| 🇷🇺 Russian | **F1 — Anna** (female) | **M1 — Porfiry** (male) |
-| 🇬🇧 English | **F1** (female) | **M1** (male) |
+| Language | Female → | Male → |
+|----------|---------|-------|
+| Russian  | `F1` | `M1` |
+| English  | `F1` | `M1` |
 
 **Installation:** `pip install -e .[supertonic]` — the model downloads automatically on first run (~305 MB).
 
@@ -269,7 +271,7 @@ You can also enter a **custom prompt** for your own role.
 
 Settings are saved to `~/.audiobook-generator/settings.toml` after first run.
 
-You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic/silero), voice genders (main_gender, comment_gender), speed, pause durations, comment frequency, comment on/off toggle, output directory.
+You can edit: UI language, book language, AI provider, TTS engine (edge/piper/supertonic/silero), **voice gender for text and commentator** (main_gender, comment_gender), speed, pause durations, comment frequency, comment on/off toggle, output directory.
 
 API keys are stored securely in your system keyring (with encrypted file fallback).
 
