@@ -10,6 +10,7 @@ from typing import Callable, Dict, Optional
 
 import tomllib as tomli
 import customtkinter as ctk
+from customtkinter import ThemeManager
 
 from src.config.settings import Settings
 from src.core.tts_manager import resolve_voice
@@ -355,15 +356,23 @@ class PageComments(ctk.CTkFrame):
         """Обработчик переключения чекбокса генерации комментариев."""
         enabled = self.comments_enabled_var.get()
         state = "normal" if enabled else "disabled"
-        for widget in [self.freq_frame, self.role_frame, self.custom_frame]:
+        # CTk 6 запрещает text_color=None — явный цвет темы при enable
+        default_text_color = ThemeManager.theme["CTkLabel"]["text_color"]
+        label_color = "gray" if not enabled else default_text_color
+
+        def _apply(widget):
             for child in widget.winfo_children():
-                if isinstance(child, (ctk.CTkSlider, ctk.CTkOptionMenu, ctk.CTkTextbox, ctk.CTkLabel)):
-                    if not enabled:
-                        child.configure(text_color="gray")
+                if isinstance(child, ctk.CTkLabel):
+                    child.configure(text_color=label_color)
                 if isinstance(child, (ctk.CTkSlider, ctk.CTkOptionMenu)):
                     child.configure(state=state)
                 if isinstance(child, ctk.CTkTextbox):
                     child.configure(state=state)
+                if isinstance(child, ctk.CTkFrame):
+                    _apply(child)
+
+        for frame in (self.freq_frame, self.role_frame, self.custom_frame):
+            _apply(frame)
 
     def _on_tts_backend_change(self, backend: str):
         """Обработчик выбора TTS движка."""
