@@ -6,6 +6,7 @@
 from __future__ import annotations
 
 import logging
+import sys
 from pathlib import Path
 from typing import Callable, List, Optional, Type
 
@@ -73,6 +74,7 @@ class WizardController:
         # Контейнер для содержимого страницы (с прокруткой, если не помещается)
         self.content_frame = ctk.CTkScrollableFrame(parent)
         self.content_frame.pack(fill="both", expand=True, padx=5, pady=5)
+        self._enable_mousewheel()
 
         # Навигационные кнопки
         self.nav_frame = ctk.CTkFrame(parent, height=50)
@@ -201,7 +203,7 @@ class WizardController:
             page_callback,
             **kwargs,
         )
-        page.pack(fill="both", expand=True)
+        page.pack(fill="x", expand=False)
         self._current_page = page
 
         if is_create and hasattr(page, "set_nav_restore_callback"):
@@ -235,6 +237,172 @@ class WizardController:
                 fg_color=["#3B8ED0", "#1F6AA5"],
                 hover_color=["#36719F", "#144870"],
             )
+
+        # После длинной предыдущей страницы скролл мог остаться внизу —
+        # поднимаем к заголовку нового шага.
+        self._scroll_content_to_top()
+
+    def _enable_mousewheel(self):
+        """Прокрутка колесом мыши и тачпадом над областью шага.
+
+        Tk 9 (aqua/win32): двухпальцевый жест тачпада даёт <TouchpadScroll>,
+        а не <MouseWheel> (TIP 684). CTk это ещё не обрабатывает.
+        """
+        frame = self.content_frame
+        canvas = frame._parent_canvas
+        parent = frame._parent_frame
+        root = parent.winfo_toplevel()
+
+        try:
+            frame.master = canvas
+        except Exception:
+            pass
+
+        # Штатный CTk-фильтр часто ломается на дочерних CTk-виджетах
+        frame._check_if_valid_scroll = lambda _widget: False
+
+        def _pointer_over_content() -> bool:
+            try:
+                x, y = parent.winfo_pointerxy()
+                x0, y0 = parent.winfo_rootx(), parent.winfo_rooty()
+                return (
+                    x0 <= x < x0 + max(parent.winfo_width(), 1)
+                    and y0 <= y < y0 + max(parent.winfo_height(), 1)
+                )
+            except Exception:
+                return False
+
+        def _event_in_content(event) -> bool:
+            if _pointer_over_content():
+                return True
+            widget = getattr(event, "widget", None)
+            if widget is None:
+                return False
+            try:
+                path = str(widget)
+                return (
+                    str(canvas) in path
+                    or str(frame) in path
+                    or str(parent) in path
+                )
+            except Exception:
+                return False
+
+        def _over_textbox(widget) -> bool:
+            w = widget
+            for _ in range(32):
+                if w is None:
+                    return False
+                try:
+                    if isinstance(w, ctk.CTkTextbox):
+                        return True
+                    if w.winfo_class() == "Text":
+                        return True
+                    parent_path = w.winfo_parent()
+                    w = w.nametowidget(parent_path) if parent_path else None
+                except Exception:
+                    return False
+            return False
+
+        def _refresh_scrollregion():
+            try:
+                bbox = canvas.bbox("all")
+                if bbox is not None:
+                    canvas.configure(scrollregion=bbox)
+            except Exception:
+                pass
+
+        def _scroll_pixels(delta_x: int, delta_y: int):
+            if not delta_x and not delta_y:
+                return
+            _refresh_scrollregion()
+            try:
+                canvas.tk.call("tk::ScrollByPixels", canvas._w, delta_x, delta_y)
+                return
+            except Exception:
+                pass
+            if delta_y:
+                canvas.yview_scroll(int(-delta_y), "units")
+            if delta_x:
+                canvas.xview_scroll(int(-delta_x), "units")
+
+        def _on_touchpad_scroll(event):
+            """Tk 9+: двухпальцевый скролл тачпада."""
+            if not _event_in_content(event):
+                return
+            if _over_textbox(getattr(event, "widget", None)):
+                return
+            try:
+                dx, dy = canvas.tk.call(
+                    "tk::PreciseScrollDeltas",
+                    getattr(event, "delta", 0),
+                )
+                delta_x, delta_y = int(dx), int(dy)
+            except Exception:
+                return
+            if delta_x == 0 and delta_y == 0:
+                return
+            _scroll_pixels(delta_x, delta_y)
+            return "break"
+
+        def _on_mousewheel(event):
+            """Обычное колесо мыши (и старый Tk 8.x, где тачпад = MouseWheel)."""
+            if not _event_in_content(event):
+                return
+            if _over_textbox(getattr(event, "widget", None)):
+                return
+            _refresh_scrollregion()
+
+            delta = getattr(event, "delta", 0) or 0
+            num = getattr(event, "num", None)
+            try:
+                delta = int(delta)
+            except (TypeError, ValueError):
+                delta = 0
+
+            if sys.platform == "darwin":
+                steps = -delta
+            elif sys.platform.startswith("win"):
+                steps = int(-delta / 120) if delta else 0
+            elif num == 4:
+                steps = -3
+            elif num == 5:
+                steps = 3
+            else:
+                steps = -delta if delta else 0
+
+            if not steps:
+                return
+            canvas.yview_scroll(steps, "units")
+            return "break"
+
+        root.bind_all("<MouseWheel>", _on_mousewheel, add="+")
+        root.bind_all("<Button-4>", _on_mousewheel, add="+")
+        root.bind_all("<Button-5>", _on_mousewheel, add="+")
+        # Tk 9 aqua/win32: тачпад больше не шлёт MouseWheel
+        try:
+            root.bind_all("<TouchpadScroll>", _on_touchpad_scroll, add="+")
+        except Exception:
+            pass
+
+    def _scroll_content_to_top(self):
+        """Сбросить вертикальный скролл content_frame в начало."""
+        def _do_scroll():
+            try:
+                self.content_frame.update_idletasks()
+                canvas = getattr(self.content_frame, "_parent_canvas", None)
+                if canvas is not None:
+                    canvas.yview_moveto(0)
+            except Exception:
+                pass
+
+        _do_scroll()
+        # Повтор после раскладки новой страницы (иначе scrollregion ещё старый)
+        try:
+            self.content_frame.after(1, _do_scroll)
+            self.content_frame.after(50, _do_scroll)
+        except Exception:
+            pass
 
     def _create_nav_texts(self, lang: Optional[str] = None) -> dict:
         from src.ui.pages.page_create import CREATE_TEXTS
