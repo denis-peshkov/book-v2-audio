@@ -309,26 +309,53 @@ class Pipeline:
 
             self._chapter_audio_paths = []
             n_syn = len(synthesized)
+            total_merge_frags = sum(j.segment_count for j in synthesized)
+            merge_done = 0
+
+            self._report(
+                progress_callback,
+                f"Склейка глав: сегментов {total_merge_frags}…",
+                self._W_PREPARE + self._W_SYNTH,
+                stage=STAGE_CHAPTER_MERGE,
+                scope_line=_scope_line(),
+                segment_index=0,
+                segment_total=total_merge_frags,
+            )
+
             for midx, job in enumerate(synthesized):
                 self._pause_event.wait()
                 scope_now = _scope_line(job.chapter_num + 1)
-                prog = (
-                    self._W_PREPARE + self._W_SYNTH
-                    + self._W_CH_MERGE * (midx / max(n_syn, 1))
-                )
-                self._report(
-                    progress_callback,
-                    f"Склейка главы {midx + 1}/{n_syn}…",
-                    prog,
-                    stage=STAGE_CHAPTER_MERGE,
-                    scope_line=scope_now,
-                    segment_index=midx + 1,
-                    segment_total=n_syn,
-                )
+
+                def _frag_progress(
+                    completed: int,
+                    total: int,
+                    *,
+                    _base=merge_done,
+                    _scope=scope_now,
+                    _midx=midx,
+                ):
+                    finished = _base + completed
+                    prog = (
+                        self._W_PREPARE + self._W_SYNTH
+                        + self._W_CH_MERGE * (finished / max(total_merge_frags, 1))
+                    )
+                    if progress_callback:
+                        progress_callback(
+                            f"Склейка главы {_midx + 1}/{n_syn}: "
+                            f"сегмент {finished}/{total_merge_frags}",
+                            prog,
+                            stage=STAGE_CHAPTER_MERGE,
+                            scope_line=_scope,
+                            segment_index=finished,
+                            segment_total=total_merge_frags,
+                        )
+
                 chapter_audio = await self._assemble_chapter_audio(
                     job.sentences, job.comments, job.chapter_dir, job.chapter_num,
+                    fragment_callback=_frag_progress,
                 )
                 self._chapter_audio_paths.append(chapter_audio)
+                merge_done += job.segment_count
 
             if not self._chapter_audio_paths:
                 raise ValueError("Не удалось склеить ни одной главы")
@@ -389,6 +416,7 @@ class Pipeline:
         comments: List[Optional[str]],
         chapter_dir: Path,
         chapter_num: int,
+        fragment_callback: Optional[Callable[[int, int], None]] = None,
     ) -> Path:
         """Сборка аудиофрагментов главы в один файл."""
         segments: List[Tuple[Path, float]] = []
@@ -416,7 +444,11 @@ class Pipeline:
                     segments[-1] = (segments[-1][0], tts_cfg.pause_after_comment)
 
         chapter_output = self._temp_dir / f"chapter_{chapter_num:04d}_audio.wav"
-        return self.audio_assembler.assemble_chapter(segments, chapter_output)
+        return self.audio_assembler.assemble_chapter(
+            segments,
+            chapter_output,
+            fragment_callback=fragment_callback,
+        )
 
     def pause(self):
         """Поставить процесс на паузу."""
