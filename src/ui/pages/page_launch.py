@@ -13,6 +13,7 @@ import customtkinter as ctk
 from src.config.settings import Settings
 from src.core.fb2_parser import FB2Parser
 from src.core.tts_manager import resolve_voice
+from src.utils.scope_display import format_scope
 
 logger = logging.getLogger(__name__)
 
@@ -28,9 +29,6 @@ LAUNCH_TEXTS = {
         "freq_format": "каждые {} предложений",
         "freq_off": "Отключены",
         "scope_label": "Объём озвучки",
-        "scope_all": "Полный",
-        "scope_single": "Глава {}",
-        "scope_range": "Главы с {} по {}",
         "total_chapters_label": "Всего глав в файле",
         "total_chapters_unknown": "—",
         "voice_main_label": "Голос текста",
@@ -51,9 +49,6 @@ LAUNCH_TEXTS = {
         "freq_format": "every {} sentences",
         "freq_off": "Disabled",
         "scope_label": "Narration scope",
-        "scope_all": "Full book",
-        "scope_single": "Chapter {}",
-        "scope_range": "Chapters {}–{}",
         "total_chapters_label": "Total chapters in file",
         "total_chapters_unknown": "—",
         "voice_main_label": "Text voice",
@@ -74,9 +69,6 @@ LAUNCH_TEXTS = {
         "freq_format": "{}文ごと",
         "freq_off": "無効",
         "scope_label": "ナレーション範囲",
-        "scope_all": "全章",
-        "scope_single": "第{}章",
-        "scope_range": "第{}章〜第{}章",
         "total_chapters_label": "ファイル内の総章数",
         "total_chapters_unknown": "—",
         "voice_main_label": "テキストの声",
@@ -96,9 +88,6 @@ LAUNCH_TEXTS = {
         "freq_format": "每{}句",
         "freq_off": "已禁用",
         "scope_label": "朗读范围",
-        "scope_all": "全书",
-        "scope_single": "第{}章",
-        "scope_range": "第{}章至第{}章",
         "total_chapters_label": "文件中总章节数",
         "total_chapters_unknown": "—",
         "voice_main_label": "正文语音",
@@ -215,19 +204,6 @@ class PageLaunch(ctk.CTkFrame):
                 anchor="w",
             ).pack(side="left", padx=5, pady=2)
 
-        # Кнопка запуска
-        self.launch_btn = ctk.CTkButton(
-            self,
-            text=self._get_launch_text(),
-            font=ctk.CTkFont(size=16, weight="bold"),
-            command=self._on_launch,
-            height=50,
-            width=400,
-            fg_color="green",
-            hover_color="darkgreen",
-        )
-        self.launch_btn.pack(pady=30)
-
         # Предупреждение
         warning = ctk.CTkLabel(
             self,
@@ -236,7 +212,7 @@ class PageLaunch(ctk.CTkFrame):
             text_color="orange",
             justify="center",
         )
-        warning.pack(pady=(0, 10))
+        warning.pack(pady=(20, 10))
 
     def _lang_display(self, code: str) -> str:
         """Конвертация кода языка в отображаемое название."""
@@ -275,39 +251,12 @@ class PageLaunch(ctk.CTkFrame):
 
     def _scope_summary(self) -> str:
         """Человекочитаемый объём озвучки по chapter_start/chapter_end."""
-        lang = self.settings.ui_lang
-        t = LAUNCH_TEXTS.get(lang, LAUNCH_TEXTS["ru"])
-        start = int(getattr(self.settings, "chapter_start", 0) or 0)
-        end = int(getattr(self.settings, "chapter_end", 0) or 0)
-
-        # Как в pipeline: 0/0 = вся книга
-        if start == 0 and end == 0:
-            return t["scope_all"]
-
-        # Одна глава: end == start + 1 (индексы 0-based / exclusive end)
-        if end == start + 1:
-            return t["scope_single"].format(start + 1)
-
-        # Диапазон: отображаем 1-based включительно
-        from_ch = start + 1
-        to_ch = end if end > 0 else (self._total_chapters or from_ch)
-        return t["scope_range"].format(from_ch, to_ch)
-
-    def _get_launch_text(self) -> str:
-        """Получение текста кнопки запуска."""
-        lang = self.settings.ui_lang
-        t = LAUNCH_TEXTS.get(lang, LAUNCH_TEXTS["ru"])
-        book_path = getattr(self.settings, "book_path", "")
-        if book_path:
-            name = Path(str(book_path)).stem
-            return f'{t["launch_default"]} "{name}"'
-        return t["launch_default"]
-
-    def _on_launch(self):
-        """Обработчик нажатия кнопки запуска."""
-        logger.info("Запуск создания аудиокниги")
-        if self.on_complete:
-            self.on_complete()
+        return format_scope(
+            int(getattr(self.settings, "chapter_start", 0) or 0),
+            int(getattr(self.settings, "chapter_end", 0) or 0),
+            self._total_chapters,
+            self.settings.ui_lang,
+        )
 
     def get_data(self) -> dict:
         """Сбор данных со страницы."""

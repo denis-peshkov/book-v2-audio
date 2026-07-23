@@ -14,7 +14,7 @@ from typing import Any, Callable, Dict, List, Optional
 
 import edge_tts
 
-from src.core.tts_base import TTSBackend
+from src.core.tts_base import SynthesisCancelled, TTSBackend
 
 logger = logging.getLogger(__name__)
 
@@ -101,6 +101,14 @@ class EdgeTTSManager(TTSBackend):
         # Сохраняем голоса для быстрого доступа из колбэков
         self._main_voice_name = ""
         self._comment_voice_name = ""
+        self._cancel_event = None
+
+    def bind_cancel_event(self, event) -> None:
+        self._cancel_event = event
+
+    def _raise_if_canceled(self) -> None:
+        if self._cancel_event is not None and self._cancel_event.is_set():
+            raise SynthesisCancelled("Создание аудиокниги отменено")
 
     async def synthesize_segment(
         self,
@@ -163,6 +171,7 @@ class EdgeTTSManager(TTSBackend):
 
         last_exception: Optional[Exception] = None
         for attempt in range(1, max_retries + 1):
+            self._raise_if_canceled()
             try:
                 communicate = edge_tts.Communicate(text, voice, rate=rate)
                 await asyncio.wait_for(
@@ -186,6 +195,8 @@ class EdgeTTSManager(TTSBackend):
                     )
                 return output_path
 
+            except SynthesisCancelled:
+                raise
             except Exception as exc:
                 last_exception = exc
                 exc_str = str(exc)
@@ -209,6 +220,7 @@ class EdgeTTSManager(TTSBackend):
                 )
 
                 if is_retryable and attempt < max_retries:
+                    self._raise_if_canceled()
                     delay = retry_delay * (2 ** (attempt - 1))
                     _log_edge_failure(
                         voice=voice,
@@ -221,7 +233,13 @@ class EdgeTTSManager(TTSBackend):
                         final=False,
                     )
                     logger.warning("Повтор Edge TTS через %.1f сек...", delay)
-                    await asyncio.sleep(delay)
+                    # Прерываемый sleep: проверяем отмену каждую секунду
+                    remaining = delay
+                    while remaining > 0:
+                        self._raise_if_canceled()
+                        step = min(0.25, remaining)
+                        await asyncio.sleep(step)
+                        remaining -= step
                     continue
 
                 # Финальный провал: логируем полный текст и бросаем RuntimeError,
@@ -314,6 +332,7 @@ class EdgeTTSManager(TTSBackend):
                 detail_callback(completed + 1, total, preview, seg_voice, "edge")
 
         for i, text in enumerate(text_segments):
+            self._raise_if_canceled()
             # Основной текст
             _report_segment(text, self.config.main_voice)
             try:
@@ -321,6 +340,8 @@ class EdgeTTSManager(TTSBackend):
                     text, self.config.main_voice, self.config.main_speed,
                     chapter_dir, segment_index=i * 2,
                 )
+            except SynthesisCancelled:
+                raise
             except Exception as e:
                 logger.error(
                     "Ошибка синтеза сегмента #%d (гл.текст): %s — генерирую тишину. "
@@ -338,6 +359,7 @@ class EdgeTTSManager(TTSBackend):
 
             # Комментарий (если есть для этого сегмента)
             if i < len(comment_segments) and comment_segments[i]:
+                self._raise_if_canceled()
                 comment = comment_segments[i]
                 _report_segment(comment, self.config.comment_voice)
                 try:
@@ -346,6 +368,8 @@ class EdgeTTSManager(TTSBackend):
                         self.config.comment_speed, chapter_dir,
                         segment_index=i * 2 + 1,
                     )
+                except SynthesisCancelled:
+                    raise
                 except Exception as e:
                     logger.error(
                         "Ошибка синтеза комментария #%d: %s — генерирую тишину. "
