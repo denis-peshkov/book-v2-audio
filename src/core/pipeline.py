@@ -18,6 +18,7 @@ from .comment_manager import CommentManager, CommentConfig
 from .tts_manager import TTSManager, TTSConfig
 from .tts_base import SynthesisCancelled
 from .audio_assembler import AudioAssembler
+from .audio_bitrate import clamp_bitrate
 from .checkpoint_manager import CheckpointManager, Checkpoint
 from src.utils.scope_display import (
     STAGE_PREPARE,
@@ -71,7 +72,11 @@ class Pipeline:
         self.sentence_splitter = SentenceSplitter()
         self.comment_manager = CommentManager(config.comment_config)
         self.tts_manager = TTSManager(config.tts_config)
-        self.audio_assembler = AudioAssembler()
+        bitrate = clamp_bitrate(
+            config.tts_config.backend,
+            int(getattr(config.tts_config, "audio_bitrate_kbps", 0) or 0),
+        )
+        self.audio_assembler = AudioAssembler(bitrate_kbps=bitrate)
         self.checkpoint_manager = CheckpointManager(config.work_dir)
 
         self._book: Optional[ParsedBook] = None
