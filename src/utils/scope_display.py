@@ -86,6 +86,7 @@ def format_progress_scope_line(
     chapter_end: int,
     total_chapters: int,
     lang: str = "ru",
+    chapter_title: Optional[str] = None,
 ) -> str:
     """Строка для окна прогресса: текущая глава + режим + всего глав."""
     t = SCOPE_TEXTS.get(lang, SCOPE_TEXTS["ru"])
@@ -95,6 +96,12 @@ def format_progress_scope_line(
     single = int(chapter_end or 0) == int(chapter_start or 0) + 1 and int(chapter_end or 0) > 0
     if chapter_current is not None and chapter_current > 0 and not single:
         parts.append(t["current"].format(chapter_current))
+    if chapter_title:
+        # Длинный путь обрезаем для UI
+        title = chapter_title.strip()
+        if len(title) > 72:
+            title = title[:69] + "…"
+        parts.append(title)
     parts.append(scope)
     parts.append(t["total"].format(total_chapters))
     return " · ".join(parts)

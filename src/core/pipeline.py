@@ -118,13 +118,17 @@ class Pipeline:
 
             ui_lang = self.config.lang or "ru"
 
-            def _scope_line(chapter_1based: Optional[int] = None) -> str:
+            def _scope_line(
+                chapter_1based: Optional[int] = None,
+                chapter_title: Optional[str] = None,
+            ) -> str:
                 return format_progress_scope_line(
                     chapter_current=chapter_1based,
                     chapter_start=cfg_start,
                     chapter_end=cfg_end,
                     total_chapters=total_chapters,
                     lang=ui_lang,
+                    chapter_title=chapter_title,
                 )
 
             self._report(
@@ -143,7 +147,10 @@ class Pipeline:
                 self._pause_event.wait()
 
                 chapter_num = start_chapter + idx
-                scope_now = _scope_line(chapter_num + 1)
+                scope_now = _scope_line(
+                    chapter_num + 1,
+                    chapter.title or None,
+                )
                 prep_prog = 0.02 + (idx / n_ch) * (self._W_PREPARE - 0.02)
                 self._report(
                     progress_callback,
@@ -212,7 +219,10 @@ class Pipeline:
                     break
                 self._pause_event.wait()
 
-                scope_now = _scope_line(job.chapter_num + 1)
+                scope_now = _scope_line(
+                    job.chapter_num + 1,
+                    job.title or None,
+                )
                 self._report(
                     progress_callback,
                     f"Синтез главы {job_idx + 1}/{n_jobs}…",
@@ -324,7 +334,10 @@ class Pipeline:
 
             for midx, job in enumerate(synthesized):
                 self._pause_event.wait()
-                scope_now = _scope_line(job.chapter_num + 1)
+                scope_now = _scope_line(
+                    job.chapter_num + 1,
+                    job.title or None,
+                )
 
                 def _frag_progress(
                     completed: int,
